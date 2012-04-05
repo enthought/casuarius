@@ -1,9 +1,35 @@
 // Support functions for cysw.
 
+#include <sstream>
+
 #include "cysw_support.h"
 
 #include "cassowary/LinearEquation.h"
 #include "cassowary/LinearInequality.h"
+#include "cassowary/Errors.h"
+
+
+size_t get_P_Constraint_addr(P_Constraint *pcn) {
+    return reinterpret_cast<size_t>(pcn->ptr());
+}
+
+std::vector<size_t> get_cpp_exception_constraint_pointers() {
+    std::vector<size_t> constraint_pointers;
+    try {
+        // Re-throw the exception.
+        throw;
+    }
+    catch (const ExCLError &exn) {
+        const ConstraintSet* cset = exn.explanation();
+        if (cset != NULL) {
+            ConstraintSet::const_iterator it = cset->begin();
+            for (; it != cset->end(); ++it) {
+                constraint_pointers.push_back(reinterpret_cast<size_t>((*it).ptr()));
+            }
+        }
+    }
+    return constraint_pointers;
+}
 
 std::string get_cpp_exception_message() {
     std::string message;

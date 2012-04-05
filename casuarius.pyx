@@ -2,6 +2,7 @@
 """
 
 from cython.operator cimport dereference as deref
+from cython.operator cimport preincrement as inc
 from libc.math cimport fabs
 from libcpp.string cimport string
 from libcpp.vector cimport vector
@@ -12,14 +13,51 @@ from collections import defaultdict
 
 cdef extern from "cysw_support.h":
     string get_cpp_exception_message()
+    vector[size_t] get_cpp_exception_constraint_pointers()
 
 
 class CassowaryError(Exception):
-    pass
+    """ An error raised from Cassowary.
+    """
+
+class ExplainedCassowaryError(CassowaryError):
+    """ An error raised from Cassowary with a list of constraints that
+    are involved in the error.
+
+    Use the .explains() method with a list of LinearConstraints to get
+    a filtered list of LinearConstraints that explain this error.
+    """
+    # SORRY: Yes, it's an awkward API. Best I can do right now.
+
+    def explains(self, linear_constraints):
+        """ Filter a list of LinearConstraints to return only those
+        LinearConstraints that caused the error.
+        """
+        filtered = []
+        for cn in linear_constraints:
+            if cn.explains_exception(self):
+                filtered.append(cn)
+        return filtered
 
 
 cdef int raise_cassowary_error() except *:
-    raise CassowaryError(get_cpp_exception_message().c_str())
+    cdef string message
+    cdef vector[size_t] constraint_pointers
+
+    message = get_cpp_exception_message()
+    constraint_pointers = get_cpp_exception_constraint_pointers()
+    if constraint_pointers.size() > 0:
+        e = ExplainedCassowaryError(message.c_str())
+        e.explanation_constraint_pointers = []
+    else:
+        e = CassowaryError(message.c_str())
+
+    cdef vector[size_t].iterator it = constraint_pointers.begin()
+    while it != constraint_pointers.end():
+        e.explanation_constraint_pointers.append(deref(it))
+        inc(it)
+
+    raise e
 
 
 cdef extern from "cassowary/SymbolicWeight.h":
@@ -70,6 +108,9 @@ cdef extern from "cassowary/Constraint.h":
         cnGEQ = -2
         cnLT = 3
         cnGT = -3
+
+cdef extern from "cysw_support.h":
+    size_t get_P_Constraint_addr(P_Constraint *pcn)
 
 cdef extern from "cassowary/LinearEquation.h":
     cdef cppclass ClLinearEquation "LinearEquation":
@@ -588,6 +629,19 @@ cdef class LinearConstraint:
         def __set__(self, double weight):
             self._weight = weight
             deref(self.cl_linear_constraint).ChangeWeight(weight)
+
+    cpdef bint explains_exception(self, object e):
+        """ Returns True if this constraint is in the explanation list
+        of the exception.
+        """
+        if self.cl_linear_constraint == NULL or not isinstance(e, CassowaryError):
+            return False
+        cdef size_t addr = get_P_Constraint_addr(self.cl_linear_constraint)
+        cdef size_t ptr
+        for ptr in e.explanation_constraint_pointers:
+            if ptr == addr:
+                return True
+        return False
 
     def __or__(self, other):
         cdef Strength strength = self.strength
