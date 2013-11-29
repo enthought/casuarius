@@ -23,3 +23,19 @@ mingw). Other Windows C++ compilers may or may not work.
 Please contact the Enthought mailing list <enthought-dev@enthought.com> for support.
 
     https://mail.enthought.com/mailman/listinfo/enthought-dev
+
+Simple example::
+
+  import casuarius
+
+  x = casuarius.ConstraintVariable('x')
+  y = casuarius.ConstraintVariable('y')
+  z = casuarius.ConstraintVariable('z')
+  gte = x + y >= z
+  eq = z + y == 10
+  solver = casuarius.Solver()
+  solver.autosolve = True
+  solver.add_constraint(gte)
+  solver.add_constraint(eq)
+
+  print x, y, z
