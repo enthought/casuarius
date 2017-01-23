@@ -223,6 +223,7 @@ cdef class Strength:
 
 
 required = Strength('required', SymbolicWeight((1000.0, 1000.0, 1000.0)), is_required=True)
+_internal_required = Strength('_internal_required', SymbolicWeight((500.0, 500.0, 500.0)))
 strong = Strength('strong', SymbolicWeight((1.0, 0.0, 0.0)))
 medium = Strength('medium', SymbolicWeight((0.0, 1.0, 0.0)))
 weak = Strength('weak', SymbolicWeight((0.0, 0.0, 1.0)))
